@@ -13,6 +13,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Flutter Demo',
       theme: ThemeData(
         // This is the theme of your application.
@@ -51,6 +52,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   final List<Note> noteList = [];
+
   @override
   Widget build(BuildContext context) {
     // This method is rerun every time setState is called, for instance as done
@@ -96,7 +98,21 @@ class _MyHomePageState extends State<MyHomePage> {
                   padding: const EdgeInsets.only(top: 8.0),
                   child: ListTile(
                     onLongPress: () => setState(() => noteList.removeAt(index)),
-                    tileColor: Colors.black.withOpacity(0.3),
+                    onTap: () => showDialog(
+                      context: context,
+                      builder: (context) => DialogWindow(
+                        title: noteList[index].title,
+                        content: noteList[index].content,
+                        lable: 'Edit your note',
+                        onSubmit: (String title, String content, String date,
+                            String color) {
+                          Function notechanger = changer(noteList[index]);
+                          notechanger(title, content, date, color);
+                          setState(() {});
+                        },
+                      ),
+                    ),
+                    tileColor: noteList[index].noteColor,
                     leading: Text(
                       noteList[index].title,
                       style: const TextStyle(fontWeight: FontWeight.bold),
@@ -115,63 +131,135 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => addWindowBuilder(),
+        onPressed: () => showDialog(
+          context: context,
+          builder: (context) => DialogWindow(
+            lable: 'Add your note',
+            onSubmit:
+                (String title, String content, String date, String color) {
+              try {
+                noteList.add(
+                  Note.add(
+                    title,
+                    content,
+                    noteList,
+                    date,
+                    color.toLowerCase(),
+                  ),
+                );
+              } catch (e) {
+                showDialog(
+                  context: context,
+                  builder: (BuildContext context) => AlertDialog(
+                    title: const Text('Error'),
+                    content: Text(e.toString()),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Close'),
+                      )
+                    ],
+                  ),
+                );
+              }
+              setState(() {});
+            },
+          ),
+        ),
         child: const Icon(Icons.add),
       ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
+}
 
-  addWindowBuilder() {
-    TextEditingController titleController = TextEditingController();
-    TextEditingController contentController = TextEditingController();
-    TextEditingController dateController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: const Text('Add your note'),
-        content: Column(
-          children: [
-            AppTextField(
-              controller: titleController,
-              label: 'Title',
-            ),
-            AppTextField(
-              controller: contentController,
-              label: 'Content',
-            ),
-            AppTextField(
-              controller: dateController,
-              label: 'Date',
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+class DialogWindow extends StatefulWidget {
+  final String lable;
+  final String title;
+  final String content;
+  final Function onSubmit;
+
+  const DialogWindow({
+    Key? key,
+    this.lable = '',
+    this.title = '',
+    this.content = '',
+    required this.onSubmit,
+  }) : super(key: key);
+
+  @override
+  State<DialogWindow> createState() => _DialogWindowState();
+}
+
+class _DialogWindowState extends State<DialogWindow> {
+  late TextEditingController titleController;
+  late TextEditingController contentController;
+  late TextEditingController dateController;
+  late TextEditingController colorController;
+
+  @override
+  void initState() {
+    titleController = TextEditingController(text: widget.title);
+    contentController = TextEditingController(text: widget.content);
+    dateController = TextEditingController();
+    colorController = TextEditingController();
+    super.initState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.lable),
+      content: Column(
+        children: [
+          AppTextField(
+            controller: titleController,
+            label: 'Title',
           ),
-          TextButton(
-            onPressed: () {
-              noteList.add(dateController.text == ''
-                  ? Note(
-                      title: titleController.text,
-                      content: contentController.text)
-                  : Note.customTime(titleController.text,
-                      contentController.text, dateController.text));
-              setState(() {});
-              Navigator.of(context).pop();
-            },
-            child: const Text('Add'),
+          AppTextField(
+            controller: contentController,
+            label: 'Content',
+          ),
+          AppTextField(
+            controller: dateController,
+            label: 'Date',
+          ),
+          AppTextField(
+            controller: colorController,
+            label: 'Color',
           ),
         ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+            widget.onSubmit(titleController.text, contentController.text,
+                dateController.text, colorController.text);
+          },
+          child: const Text('Submit'),
+        ),
+      ],
     );
+  }
+
+  @override
+  void dispose() {
+    titleController.dispose();
+    contentController.dispose();
+    dateController.dispose();
+    colorController.dispose();
+    super.dispose();
   }
 }
 
 class AppTextField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
+
   const AppTextField(
       {super.key, required this.controller, required this.label});
 
